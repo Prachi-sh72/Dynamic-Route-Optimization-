@@ -1,0 +1,86 @@
+import requests
+import json
+import pandas as pd
+from datetime import datetime
+
+def fetch_traffic_data(api_key, origin, destination):
+    """Fetch real-time traffic data from TomTom or Google Maps API."""
+    base_url = f"https://maps.googleapis.com/maps/api/directions/json"
+    params = {
+        "origin": origin,
+        "destination": destination,
+        "key": api_key,
+        "departure_time": "now"
+    }
+    response = requests.get(base_url, params=params)
+    if response.status_code == 200:
+        return response.json()
+    else:
+        raise Exception(f"Failed to fetch traffic data: {response.status_code}")
+
+def fetch_weather_data(api_key, location):
+    """Fetch real-time weather and air quality data from AQICN API."""
+    base_url = f"https://api.waqi.info/feed/{location}/"
+    params = {"token": api_key}
+    response = requests.get(base_url, params=params)
+    if response.status_code == 200:
+        return response.json()
+    else:
+        raise Exception(f"Failed to fetch weather data: {response.status_code}")
+
+def fetch_optimal_route(origin, destination, waypoints=None):
+    """Generate optimal routes using OSRM API."""
+    base_url = "http://router.project-osrm.org/route/v1/driving/"
+    coordinates = f"{origin};{destination}"
+    if waypoints:
+        coordinates = f"{origin};{' '.join(waypoints)};{destination}"
+    params = {
+        "overview": "full",
+        "geometries": "geojson",
+        "alternatives": "true"
+    }
+    response = requests.get(f"{base_url}{coordinates}", params=params)
+    if response.status_code == 200:
+        return response.json()
+    else:
+        raise Exception(f"Failed to fetch optimal routes: {response.status_code}")
+
+def calculate_emissions(distance_km, vehicle_type, fuel_efficiency):
+    """Estimate emissions based on distance, vehicle type, and fuel efficiency."""
+    emission_factors = {
+        "gasoline": 2.31,  # kg CO2 per liter
+        "diesel": 2.68,    # kg CO2 per liter
+        "electric": 0.0    # Assuming renewable energy
+    }
+    fuel_consumed = distance_km / fuel_efficiency
+    emissions = fuel_consumed * emission_factors.get(vehicle_type, 0)
+    return emissions
+
+def main():
+    # API Keys
+    traffic_api_key = "YOUR_GOOGLE_MAPS_API_KEY"
+    weather_api_key = "YOUR_AQICN_API_KEY"
+
+    # User Inputs
+    origin = "28.7041,77.1025"  # Example: Delhi, India
+    destination = "28.5355,77.3910"  # Example: Noida, India
+    vehicle_type = "gasoline"
+    fuel_efficiency = 15  # km per liter
+
+    print("Fetching traffic data...")
+    traffic_data = fetch_traffic_data(traffic_api_key, origin, destination)
+    
+    print("Fetching weather data...")
+    weather_data = fetch_weather_data(weather_api_key, "Delhi")
+
+    print("Calculating optimal routes...")
+    optimal_routes = fetch_optimal_route(origin, destination)
+
+    print("Estimating emissions...")
+    for route in optimal_routes["routes"]:
+        distance_km = route["distance"] / 1000  # Convert meters to kilometers
+        emissions = calculate_emissions(distance_km, vehicle_type, fuel_efficiency)
+        print(f"Route Distance: {distance_km:.2f} km | Estimated Emissions: {emissions:.2f} kg CO2")
+
+if __name__ == "__main__":
+    main()
